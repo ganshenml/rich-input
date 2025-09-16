@@ -15,8 +15,7 @@
           class="highlight editable-field" 
           :style="{
             display: 'inline-flex',
-            minWidth: '55px',
-            padding: '0 4px'
+            minWidth: '55px'
           }"
           :data-placeholder="segment.fieldConfig.placeholder"
           :data-field-key="segment.fieldKey"
@@ -493,7 +492,8 @@ onUnmounted(() => {
 
 .smart-input {
   padding: 8px;
-  line-height: 1.0;
+  line-height: 1.4;
+  min-height: 200px;
   display: block;
   background-color: #fff;
   font-size: 14px;
@@ -517,10 +517,15 @@ onUnmounted(() => {
 .highlight {
   background-color: #e0f0ff;
   border-radius: 3px;
-  padding: 0 2px;
+  padding: 4px;
   cursor: pointer;
   min-width: 20px;
   transition: background-color 0.2s ease;
+}
+
+/* 输入类型标签样式 */
+.editable-field {
+  padding: 4px;
 }
 
 .highlight:hover {
@@ -529,7 +534,7 @@ onUnmounted(() => {
 
 /* 输入文本样式 - 深蓝色显示 */
 .highlight .input {
-  color: #00008B;
+  color: #264cad;
   /* 深蓝色 RGB(0,0,139) */
   font-weight: 500;
 }
@@ -537,13 +542,13 @@ onUnmounted(() => {
 /* 占位符样式 */
 .highlight .placeholder {
   font-style: normal;
-  color: #999;
+  color: #6e7ca0;
   pointer-events: none;
 }
 
 /* 已填写内容样式 */
 .highlight:not(:has(.placeholder[style*="display: inline"])) {
-  background-color: #c1e0ff;
+  background-color: #e7eff7;
 }
 
 .dropdown-menu {
