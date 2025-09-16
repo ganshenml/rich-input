@@ -1,41 +1,39 @@
 <template>
   <div class="rich-input-container">
     <!-- 智能输入框主体 -->
-    <div 
-      ref="smartInputRef"
-      class="smart-input" 
-      contenteditable="true"
-      @click="handleInputClick"
-    >
-      <!-- 动态渲染模板片段 -->
+    <div ref="smartInputRef" class="smart-input" contenteditable="true" @click="handleInputClick">
       <template v-for="(segment, index) in templateSegments" :key="index">
         <!-- 普通文本片段 -->
-        <span v-if="segment.type === 'text'">{{ segment.content }}</span>
+        <template v-if="segment.type === 'text'">
+          {{ segment.content }}
+        </template>
         
         <!-- 输入字段片段 -->
         <span 
           v-else-if="segment.fieldConfig?.type === 'input'"
           contenteditable="true" 
           class="highlight editable-field" 
-          :style="{ display: 'flex', minWidth: '55px', padding: '0 4px' }"
+          :style="{
+            display: 'inline-flex',
+            minWidth: '55px',
+            padding: '0 4px'
+          }"
           :data-placeholder="segment.fieldConfig.placeholder"
           :data-field-key="segment.fieldKey"
           @click="handleEditableClick"
         >
-          <span 
-            class="input" 
-            style="padding-left: 1px;"
-          >
-            {{ segment.fieldConfig.defaultValue || '' }}{{ segment.fieldConfig.defaultValue ? '' : '\uFEFF' }}
+          <span class="input" style="padding-left: 1px;">
+            {{ segment.fieldConfig.defaultValue || '' }}
+            <span v-if="!segment.fieldConfig.defaultValue">&#xFEFF;</span>
           </span>
           <span 
             contenteditable="false" 
             class="placeholder" 
-            :style="{ 
-              display: segment.fieldConfig.defaultValue ? 'none' : 'inline-block', 
-              pointerEvents: 'none', 
-              userSelect: 'none', 
-              opacity: 0.7 
+            :style="{
+              display: segment.fieldConfig.defaultValue ? 'none' : 'inline-block',
+              pointerEvents: 'none',
+              userSelect: 'none',
+              opacity: '0.7'
             }"
           >
             {{ segment.fieldConfig.placeholder }}
@@ -46,8 +44,8 @@
         <span 
           v-else-if="segment.fieldConfig?.type === 'select'"
           class="highlight dropdown-field" 
-          :data-type="segment.fieldKey" 
-          :data-value="segment.content" 
+          :data-type="segment.fieldKey"
+          :data-value="segment.content"
           :data-field-key="segment.fieldKey"
           contenteditable="false"
           @click="handleDropdownClick"
@@ -58,18 +56,8 @@
     </div>
 
     <!-- 下拉菜单容器 -->
-    <div 
-      ref="dropdownMenuRef"
-      class="dropdown-menu"
-      :style="dropdownStyle"
-      v-if="showDropdown"
-    >
-      <div 
-        v-for="item in currentOptions" 
-        :key="item"
-        class="dropdown-item"
-        @click="selectOption(item)"
-      >
+    <div ref="dropdownMenuRef" class="dropdown-menu" :style="dropdownStyle" v-if="showDropdown">
+      <div v-for="item in currentOptions" :key="item" class="dropdown-item" @click="selectOption(item)">
         {{ item }}
       </div>
     </div>
@@ -242,6 +230,8 @@ const templateSegments = computed(() => {
   return segments
 })
 
+
+
 /**
  * 处理输入框点击事件
  * @param event - 点击事件对象
@@ -254,7 +244,7 @@ const handleInputClick = (event: Event): void => {
   if (target.classList.contains('editable-field')) {
     handleEditableField(target as HTMLElement)
   }
-  
+
   // 处理下拉选择字段
   if (target.classList.contains('dropdown-field')) {
     const fieldKey = target.getAttribute('data-field-key')
@@ -282,7 +272,7 @@ const handleDropdownClick = (event: Event): void => {
   event.stopPropagation()
   const target = event.currentTarget as HTMLElement
   const fieldKey = target.getAttribute('data-field-key')
-  
+
   if (fieldKey && OPTIONS.value[fieldKey]) {
     showDropdownMenu(target, fieldKey)
   }
@@ -295,7 +285,7 @@ const handleDropdownClick = (event: Event): void => {
 const handleEditableField = (target: HTMLElement): void => {
   const inputSpan = target.querySelector('.input') as HTMLElement
   const placeholderSpan = target.querySelector('.placeholder') as HTMLElement
-  
+
   if (!inputSpan || !placeholderSpan) return
 
   // 初始化：确保至少有一个文本节点
@@ -327,7 +317,7 @@ const handleEditableField = (target: HTMLElement): void => {
    */
   const handleChange = (): void => {
     if (isProgrammaticChange) return
-    
+
     const currentSpan = ensureInputElement()
     const hasContent = currentSpan.textContent?.trim() !== ''
 
@@ -336,7 +326,7 @@ const handleEditableField = (target: HTMLElement): void => {
       currentSpan.innerHTML = '' // 清空但保留元素
       const textNode = document.createTextNode('\uFEFF')
       currentSpan.appendChild(textNode)
-      
+
       // 移动光标到零宽空格后
       const range = document.createRange()
       range.setStart(textNode, 1)
@@ -344,7 +334,7 @@ const handleEditableField = (target: HTMLElement): void => {
       const sel = window.getSelection()
       sel?.removeAllRanges()
       sel?.addRange(range)
-      
+
       setTimeout(() => {
         isProgrammaticChange = false
       }, 0)
@@ -397,7 +387,7 @@ const showDropdownMenu = async (target: HTMLElement, type: string): Promise<void
   // 使用getBoundingClientRect()获取精确位置
   const targetRect = target.getBoundingClientRect()
   const containerRect = smartInputRef.value?.getBoundingClientRect()
-  
+
   if (!containerRect) return
 
   // 计算相对于容器的位置
@@ -407,19 +397,19 @@ const showDropdownMenu = async (target: HTMLElement, type: string): Promise<void
   // 设置下拉框位置，确保在标签正下方并保持适当间距
   dropdownStyle.value.top = `${relativeTop + 4}px` // 4px垂直间距
   dropdownStyle.value.left = `${relativeLeft}px`
-  
+
   // 确保下拉框不超出视窗边界
   if (dropdownMenuRef.value) {
     const dropdownRect = dropdownMenuRef.value.getBoundingClientRect()
     const viewportWidth = window.innerWidth
     const viewportHeight = window.innerHeight
-    
+
     // 水平边界检查
     if (dropdownRect.right > viewportWidth) {
       const adjustment = dropdownRect.right - viewportWidth + 10
       dropdownStyle.value.left = `${relativeLeft - adjustment}px`
     }
-    
+
     // 垂直边界检查 - 如果下方空间不足，显示在上方
     if (dropdownRect.bottom > viewportHeight) {
       const relativeTopAbove = targetRect.top - containerRect.top - dropdownRect.height
@@ -436,10 +426,10 @@ const selectOption = (option: string) => {
   if (currentField.value && currentTarget.value) {
     // 更新字段值存储
     fieldValues.value[currentField.value] = option
-    
+
     // 直接更新当前点击的目标元素显示内容
     currentTarget.value.textContent = option
-    
+
     // 同时更新data-value属性
     currentTarget.value.setAttribute('data-value', option)
   }
@@ -463,7 +453,7 @@ const hideDropdown = (): void => {
  */
 const handleClickOutside = (event: Event): void => {
   if (!showDropdown.value) return
-  
+
   const target = event.target as Node
   const isClickInsideDropdown = dropdownMenuRef.value?.contains(target)
   const isClickInsideContainer = smartInputRef.value?.contains(target)
@@ -480,6 +470,7 @@ const handleClickOutside = (event: Event): void => {
  * 组件挂载时添加全局点击事件监听
  */
 onMounted(() => {
+  console.log('组件挂载监听handleClickOutside');
   document.addEventListener('click', handleClickOutside)
 })
 
@@ -495,23 +486,32 @@ onUnmounted(() => {
 .rich-input-container {
   position: relative;
   width: 100%;
+  border-radius: 4px;
+  border: 1px solid #ddd;
+  min-height: 200px;
 }
 
 .smart-input {
-  min-height: 100px;
-  border: 1px solid #ddd;
-  padding: 10px;
-  line-height: 1.5;
-  display: flex;
-  flex-wrap: wrap;
+  padding: 8px;
+  line-height: 1.0;
+  display: block;
   background-color: #fff;
-  border-radius: 4px;
   font-size: 14px;
+  /* 确保容器能够根据内容自动增高 */
+  height: auto;
+  overflow: visible;
+  /* 移除任何可能的高度限制 */
+  max-height: none;
+  /* 确保文本能够在字符级别换行 */
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
-.smart-input span {
+/* 标签字段保持inline-block以维持独立性和交互功能 */
+.smart-input .highlight {
   display: inline-block;
-  height: 100%;
+  vertical-align: baseline;
 }
 
 .highlight {
@@ -529,7 +529,8 @@ onUnmounted(() => {
 
 /* 输入文本样式 - 深蓝色显示 */
 .highlight .input {
-  color: #00008B; /* 深蓝色 RGB(0,0,139) */
+  color: #00008B;
+  /* 深蓝色 RGB(0,0,139) */
   font-weight: 500;
 }
 

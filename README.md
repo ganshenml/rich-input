@@ -6,7 +6,7 @@
 
 ### 组件效果预览
 
-![RichInput 组件效果](https://github.com/ganshenml/rich-input/blob/main/public/images/rich-input-demo.png?raw=true)
+![RichInput 组件效果](./public/images/rich-input-demo.png)
 
 ### 主要功能
 
