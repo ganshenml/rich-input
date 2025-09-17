@@ -1,7 +1,7 @@
 <template>
   <div class="rich-input-container">
     <!-- 智能输入框主体 -->
-    <div ref="smartInputRef" class="smart-input" contenteditable="true" @click="handleInputClick">
+    <div ref="smartInputRef" class="smart-input" contenteditable="true" :key="renderKey" @click="handleInputClick">
       <template v-for="(segment, index) in templateSegments" :key="index">
         <!-- 普通文本片段 -->
         <template v-if="segment.type === 'text'">
@@ -64,7 +64,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue'
+import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
 
 /**
  * 字段类型枚举
@@ -166,6 +166,66 @@ const dropdownStyle = ref({
  * 保存用户输入或选择的值
  */
 const fieldValues = ref<Record<string, string>>({})
+
+/**
+ * 渲染键值
+ * 用于强制Vue重新渲染整个组件
+ */
+const renderKey = ref(0)
+
+/**
+ * 初始化字段值
+ * 根据配置设置字段的默认值
+ */
+const initializeFieldValues = (): void => {
+  const newFieldValues: Record<string, string> = {}
+  
+  Object.entries(props.config.fields).forEach(([key, field]) => {
+    newFieldValues[key] = field.defaultValue || ''
+  })
+  
+  fieldValues.value = newFieldValues
+  console.log('字段值已初始化:', fieldValues.value)
+  
+  // 强制触发视图更新，确保DOM与数据同步
+  nextTick(() => {
+    resetInputFieldsDOM()
+  })
+}
+
+/**
+ * 重置输入字段的DOM状态
+ * 确保输入字段的显示与fieldValues同步
+ */
+const resetInputFieldsDOM = (): void => {
+  if (!smartInputRef.value) return
+  
+  // 查找所有可编辑字段并重置其DOM状态
+  const editableFields = smartInputRef.value.querySelectorAll('.editable-field')
+  editableFields.forEach((field) => {
+    const fieldKey = field.getAttribute('data-field-key')
+    if (!fieldKey) return
+    
+    const inputSpan = field.querySelector('.input') as HTMLElement
+    const placeholderSpan = field.querySelector('.placeholder') as HTMLElement
+    
+    if (inputSpan && placeholderSpan) {
+      const currentValue = fieldValues.value[fieldKey] || ''
+      
+      // 清空输入区域并设置新值
+      inputSpan.innerHTML = ''
+      if (currentValue) {
+        inputSpan.appendChild(document.createTextNode(currentValue))
+        placeholderSpan.style.display = 'none'
+      } else {
+        inputSpan.appendChild(document.createTextNode('\uFEFF'))
+        placeholderSpan.style.display = 'inline'
+      }
+    }
+  })
+  
+  console.log('输入字段DOM状态已重置')
+}
 
 /**
  * 动态生成OPTIONS配置
@@ -466,11 +526,31 @@ const handleClickOutside = (event: Event): void => {
  */
 
 /**
- * 组件挂载时添加全局点击事件监听
+ * 监听配置变化，重新初始化字段值并强制重新渲染
+ */
+watch(
+  () => props.config,
+  (newConfig, oldConfig) => {
+    if (newConfig !== oldConfig) {
+      console.log('配置已变化，重新初始化字段值并强制重新渲染');
+      // 更新渲染键值强制Vue重新渲染整个组件
+      renderKey.value += 1
+      // 重新初始化字段值
+      initializeFieldValues()
+    }
+  },
+  { deep: true, immediate: false }
+)
+
+/**
+ * 组件挂载时添加全局点击事件监听并初始化字段值
  */
 onMounted(() => {
   console.log('组件挂载监听handleClickOutside');
   document.addEventListener('click', handleClickOutside)
+  
+  // 初始化字段值
+  initializeFieldValues()
 })
 
 /**
