@@ -765,6 +765,29 @@ onUnmounted(() => {
   padding: 4px;
 }
 
+/* 下拉槽位：为可下拉的字段添加向下箭头（纯CSS，无SVG） */
+.dropdown-field {
+  position: relative; /* 为伪元素定位提供参照 */
+  /* 将箭头与文本间距缩小为当前一半（约2px） */
+  padding-right: 18px; /* 16px 箭头 + 2px 间距 */
+}
+.dropdown-field::after {
+  /* 使用Unicode字符作为指示符，不使用SVG */
+  content: '▾'; /* U+25BE 小下三角，跨平台可读性好 */
+  position: absolute;
+  right: 4px; /* 维持右侧余量，实际文本与箭头间距≈2px */
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 16px; /* 调大箭头尺寸以提升可见性 */
+  line-height: 1;
+  color: #4F46E5; /* indigo-600，与选中态边框一致 */
+  opacity: 0.9;
+  pointer-events: none; /* 箭头不拦截点击，点击仍触发槽位 */
+}
+.dropdown-field:hover::after {
+  color: #4338CA; /* indigo-700，悬停稍微加深 */
+}
+
 .highlight:hover {
   /* 悬停时加深背景并轻微发光 */
   background-color: rgba(99, 102, 241, 0.18);
