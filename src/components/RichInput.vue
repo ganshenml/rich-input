@@ -15,8 +15,8 @@
           <span class="input" style="padding-left: 0">
             {{ segment.fieldConfig.defaultValue || '' }}
           </span>
+          <!-- 占位符显隐改由 data-has-content 属性 + CSS 控制，避免交互后重置为默认样式 -->
           <span contenteditable="false" class="placeholder" :style="{
-            display: segment.fieldConfig.defaultValue ? 'none' : 'inline-block',
             pointerEvents: 'none',
             userSelect: 'none',
             opacity: '0.7'
@@ -111,6 +111,14 @@ const props = withDefaults(defineProps<Props>(), {
 })
 
 /**
+ * 组件事件：当字段值变更时通知父组件
+ * 提供完整的当前文本与字段值快照
+ */
+const emit = defineEmits<{
+  (e: 'change', payload: { text: string; values: Record<string, string> }): void
+}>()
+
+/**
  * 模板片段接口
  * 用于描述模板解析后的文本片段和字段片段
  */
@@ -156,6 +164,67 @@ const fieldValues = ref<Record<string, string>>({})
 const renderKey = ref(0)
 
 /**
+ * 生成当前完整文本（替换模板中的占位符为当前字段值或默认值）
+ */
+const getCurrentText = (): string => {
+  const template = props.config.template
+  return template.replace(/\{([^}]+)\}/g, (_matched: string, key: string) => {
+    const field = props.config.fields[key]
+    if (!field) return `{${key}}`
+    const value = fieldValues.value[key]
+    // 两种字段类型都存在 defaultValue，缺失时退回到占位方括号
+    return (value ?? (field as { defaultValue?: string }).defaultValue ?? `[${key}]`)
+  })
+}
+
+/**
+ * 获取当前所有字段值的拷贝
+ */
+const getValues = (): Record<string, string> => ({ ...fieldValues.value })
+
+/**
+ * 获取指定选择字段的当前选项（若非选择字段也返回其值）
+ */
+const getSelection = (fieldKey: string): string | undefined => fieldValues.value[fieldKey]
+
+/**
+ * 获取所有选择字段的当前选项映射
+ */
+const getSelections = (): Record<string, string> => {
+  const result: Record<string, string> = {}
+  Object.entries(props.config.fields).forEach(([key, field]) => {
+    if (field.type === 'select' && fieldValues.value[key] !== undefined) {
+      result[key] = fieldValues.value[key]
+    }
+  })
+  return result
+}
+
+/**
+ * 触发变更事件，通知父组件当前文本与值
+ */
+const emitChange = (): void => {
+  try {
+    emit('change', { text: getCurrentText(), values: { ...fieldValues.value } })
+  } catch (err) {
+    // 如项目有封装日志工具，请替换为 logger.warn/err
+    // 这里通常不会抛错（无监听者时Vue内部忽略），保留catch以满足严格规则
+    console.warn('[RichInput] emit change failed:', err)
+  }
+}
+
+/**
+ * 将内部API暴露给父组件使用
+ */
+defineExpose({
+  getText: getCurrentText,
+  getValues,
+  getSelection,
+  getSelections,
+  getActiveFieldKey: () => currentField.value
+})
+
+/**
  * 初始化字段值
  * 根据配置设置字段的默认值
  */
@@ -198,11 +267,12 @@ const resetInputFieldsDOM = (): void => {
       inputSpan.innerHTML = ''
       if (currentValue) {
         inputSpan.appendChild(document.createTextNode(currentValue))
-        placeholderSpan.style.display = 'none'
+        // 使用属性控制占位符显隐，避免交互后样式回退
+        ;(field as HTMLElement).setAttribute('data-has-content', 'true')
       } else {
         // 插入零宽占位字符，确保空内容时仍可聚焦和输入
         inputSpan.appendChild(document.createTextNode('\u200B'))
-        placeholderSpan.style.display = 'inline'
+        ;(field as HTMLElement).setAttribute('data-has-content', 'false')
       }
     }
   })
@@ -385,7 +455,15 @@ const handleDropdownClick = (event: Event): void => {
       }, 0)
     }
 
-    placeholderSpan.style.display = hasContent ? 'none' : 'inline'
+    // 用属性控制占位符显隐，在任何交互下都不回退到模板的默认行内样式
+    target.setAttribute('data-has-content', hasContent ? 'true' : 'false')
+
+    // 同步可编辑字段值到内部存储，以便父组件查询与事件通知
+    const fieldKey = target.getAttribute('data-field-key')
+    if (fieldKey) {
+      fieldValues.value[fieldKey] = normalized.trim()
+      emitChange()
+    }
   }
 
   // 使用MutationObserver监听变化
@@ -492,43 +570,27 @@ const showDropdownMenu = async (target: HTMLElement, type: string): Promise<void
 
   await nextTick()
 
-  // 使用getBoundingClientRect()获取精确位置
+  // 使用 getBoundingClientRect + 容器 rect 更稳健地计算相对位置
+  const containerEl = containerRef.value
+  if (!containerEl) return
   const targetRect = target.getBoundingClientRect()
-  // 使用组件容器的坐标以确保在嵌入其他组件时位置计算正确
-  const containerRect = containerRef.value?.getBoundingClientRect()
+  const containerRect = containerEl.getBoundingClientRect()
 
-  if (!containerRect) return
+  // 相对容器的左上角坐标（加入容器滚动补偿）
+  const anchorLeft = targetRect.left - containerRect.left + containerEl.scrollLeft
+  const anchorTop = targetRect.bottom - containerRect.top + containerEl.scrollTop + 4 // 4px 下方间距
 
-  // 计算相对于容器的位置（容器为定位参考）
-  const relativeTop = targetRect.bottom - containerRect.top
-  const relativeLeft = targetRect.left - containerRect.left
+  dropdownStyle.value.top = `${anchorTop}px`
+  dropdownStyle.value.left = `${anchorLeft}px`
 
-  // 设置下拉框位置，确保在标签正下方并保持适当间距
-  dropdownStyle.value.top = `${relativeTop + 4}px` // 4px垂直间距
-  dropdownStyle.value.left = `${relativeLeft}px`
-
-  // 确保下拉框不超出容器边界（而非视窗），适配嵌入场景
+  // 边界检查：仅水平回收，保证菜单始终在槽位下方
   if (dropdownMenuRef.value) {
-    const dropdownRect = dropdownMenuRef.value.getBoundingClientRect()
-    const dropdownWidth = dropdownRect.width
-    const dropdownHeight = dropdownRect.height
-
-    // 预测位置相对于容器的边界
-    const predictedRight = relativeLeft + dropdownWidth
-    const predictedBottom = (relativeTop + 4) + dropdownHeight
-
-    // 水平边界检查（容器宽度）
-    const containerWidth = containerRect.width
+    const dropdownWidth = dropdownMenuRef.value.offsetWidth
+    const containerWidth = containerEl.clientWidth
+    const predictedRight = anchorLeft + dropdownWidth
     if (predictedRight > containerWidth) {
-      const adjustment = predictedRight - containerWidth + 10 // 右侧间距
-      dropdownStyle.value.left = `${Math.max(relativeLeft - adjustment, 0)}px`
-    }
-
-    // 垂直边界检查（容器高度），如果下方空间不足，显示在上方
-    const containerHeight = containerRect.height
-    if (predictedBottom > containerHeight) {
-      const relativeTopAbove = targetRect.top - containerRect.top - dropdownHeight
-      dropdownStyle.value.top = `${Math.max(relativeTopAbove - 4, 0)}px` // 4px垂直间距
+      const adjustment = predictedRight - containerWidth + 10 // 右侧留白
+      dropdownStyle.value.left = `${Math.max(anchorLeft - adjustment, 0)}px`
     }
   }
 }
@@ -548,6 +610,8 @@ const selectOption = (option: string) => {
     // 同时更新data-value属性
     currentTarget.value.setAttribute('data-value', option)
   }
+  // 通知父组件变更
+  emitChange()
   hideDropdown()
 }
 
@@ -629,7 +693,7 @@ onUnmounted(() => {
   box-shadow: 0 4px 14px rgba(99, 102, 241, 0.14); /* 轻微的 indigo 阴影 */
   /* 为内部编辑区留出内缩空间，确保外部圆角边框可见 */
   padding: 6px;
-  min-height: 200px;
+  min-height: 120px;
 }
 
 /* 容器选中态：显示更深的边框颜色 */
@@ -641,7 +705,7 @@ onUnmounted(() => {
 .smart-input {
   padding: 8px;
   line-height: 1.4;
-  min-height: 200px;
+  min-height: 120px;
   display: block;
   background-color: #fff;
   font-size: 14px;
@@ -726,8 +790,16 @@ onUnmounted(() => {
   pointer-events: none;
 }
 
-/* 已填写内容样式：降低背景透明度，维持科技感 */
-.highlight:not(:has(.placeholder[style*="display: inline"])) {
+/* 占位显隐通过 data-has-content 控制，避免因交互导致行内样式回退 */
+.highlight.editable-field[data-has-content="true"] .placeholder {
+  display: none;
+}
+.highlight.editable-field[data-has-content="false"] .placeholder {
+  display: inline-block;
+}
+
+/* 已填写内容样式：当有内容时降低背景透明度，维持科技感 */
+.highlight.editable-field[data-has-content="true"] {
   background-color: rgba(99, 102, 241, 0.06);
 }
 
