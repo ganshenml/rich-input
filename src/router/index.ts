@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import HomePage from '@/pages/HomePage.vue'
+import RichInputPage from '@/pages/RichInputPage.vue'
 
 // 定义路由配置
 const routes = [
@@ -14,6 +15,11 @@ const routes = [
     component: {
       template: '<div class="text-center text-xl p-8">About Page - Coming Soon</div>',
     },
+  },
+  {
+    path: '/editor',
+    name: 'editor',
+    component: RichInputPage,
   },
 ]
 

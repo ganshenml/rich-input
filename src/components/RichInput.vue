@@ -1,5 +1,5 @@
 <template>
-  <div class="rich-input-container">
+  <div class="rich-input-container" ref="containerRef">
     <!-- 智能输入框主体 -->
     <div ref="smartInputRef" class="smart-input" contenteditable="true" :key="renderKey" @click="handleInputClick">
       <template v-for="(segment, index) in templateSegments" :key="index">
@@ -7,48 +7,28 @@
         <template v-if="segment.type === 'text'">
           {{ segment.content }}
         </template>
-        
+
         <!-- 输入字段片段 -->
-        <span 
-          v-else-if="segment.fieldConfig?.type === 'input'"
-          contenteditable="true" 
-          class="highlight editable-field" 
-          :style="{
-            display: 'inline-flex',
-            minWidth: '55px'
-          }"
-          :data-placeholder="segment.fieldConfig.placeholder"
-          :data-field-key="segment.fieldKey"
-          @click="handleEditableClick"
-        >
-          <span class="input" style="padding-left: 1px;">
+        <span v-else-if="segment.fieldConfig?.type === 'input'" contenteditable="true" class="highlight editable-field"
+          :data-placeholder="segment.fieldConfig.placeholder" :data-field-key="segment.fieldKey"
+          @click="handleEditableClick">
+          <span class="input" style="padding-left: 0">
             {{ segment.fieldConfig.defaultValue || '' }}
-            <span v-if="!segment.fieldConfig.defaultValue">&#xFEFF;</span>
           </span>
-          <span 
-            contenteditable="false" 
-            class="placeholder" 
-            :style="{
-              display: segment.fieldConfig.defaultValue ? 'none' : 'inline-block',
-              pointerEvents: 'none',
-              userSelect: 'none',
-              opacity: '0.7'
-            }"
-          >
+          <span contenteditable="false" class="placeholder" :style="{
+            display: segment.fieldConfig.defaultValue ? 'none' : 'inline-block',
+            pointerEvents: 'none',
+            userSelect: 'none',
+            opacity: '0.7'
+          }">
             {{ segment.fieldConfig.placeholder }}
           </span>
         </span>
-        
+
         <!-- 选择字段片段 -->
-        <span 
-          v-else-if="segment.fieldConfig?.type === 'select'"
-          class="highlight dropdown-field" 
-          :data-type="segment.fieldKey"
-          :data-value="segment.content"
-          :data-field-key="segment.fieldKey"
-          contenteditable="false"
-          @click="handleDropdownClick"
-        >
+        <span v-else-if="segment.fieldConfig?.type === 'select'" class="highlight dropdown-field"
+          :data-type="segment.fieldKey" :data-value="segment.content" :data-field-key="segment.fieldKey"
+          contenteditable="false" @click="handleDropdownClick">
           {{ segment.content }}
         </span>
       </template>
@@ -65,6 +45,7 @@
 
 <script setup lang="ts">
 import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
+import type { CSSProperties } from 'vue'
 
 /**
  * 字段类型枚举
@@ -144,6 +125,7 @@ interface TemplateSegment {
  * 响应式数据定义
  */
 // DOM引用
+const containerRef = ref<HTMLDivElement | null>(null)
 const smartInputRef = ref<HTMLDivElement | null>(null)
 const dropdownMenuRef = ref<HTMLDivElement | null>(null)
 
@@ -153,8 +135,8 @@ const currentField = ref('') // 当前激活的字段
 const currentTarget = ref<HTMLElement | null>(null) // 当前点击的目标元素
 const currentOptions = ref<string[]>([]) // 当前字段的选项列表
 
-// 下拉菜单样式
-const dropdownStyle = ref({
+// 下拉菜单样式：使用 CSSProperties 保证 TS 校验通过
+const dropdownStyle = ref<CSSProperties>({
   position: 'absolute',
   top: '0px',
   left: '0px',
@@ -179,14 +161,14 @@ const renderKey = ref(0)
  */
 const initializeFieldValues = (): void => {
   const newFieldValues: Record<string, string> = {}
-  
+
   Object.entries(props.config.fields).forEach(([key, field]) => {
     newFieldValues[key] = field.defaultValue || ''
   })
-  
+
   fieldValues.value = newFieldValues
   console.log('字段值已初始化:', fieldValues.value)
-  
+
   // 强制触发视图更新，确保DOM与数据同步
   nextTick(() => {
     resetInputFieldsDOM()
@@ -199,31 +181,32 @@ const initializeFieldValues = (): void => {
  */
 const resetInputFieldsDOM = (): void => {
   if (!smartInputRef.value) return
-  
+
   // 查找所有可编辑字段并重置其DOM状态
   const editableFields = smartInputRef.value.querySelectorAll('.editable-field')
   editableFields.forEach((field) => {
     const fieldKey = field.getAttribute('data-field-key')
     if (!fieldKey) return
-    
+
     const inputSpan = field.querySelector('.input') as HTMLElement
     const placeholderSpan = field.querySelector('.placeholder') as HTMLElement
-    
+
     if (inputSpan && placeholderSpan) {
       const currentValue = fieldValues.value[fieldKey] || ''
-      
+
       // 清空输入区域并设置新值
       inputSpan.innerHTML = ''
       if (currentValue) {
         inputSpan.appendChild(document.createTextNode(currentValue))
         placeholderSpan.style.display = 'none'
       } else {
-        inputSpan.appendChild(document.createTextNode('\uFEFF'))
+        // 插入零宽占位字符，确保空内容时仍可聚焦和输入
+        inputSpan.appendChild(document.createTextNode('\u200B'))
         placeholderSpan.style.display = 'inline'
       }
     }
   })
-  
+
   console.log('输入字段DOM状态已重置')
 }
 
@@ -341,7 +324,7 @@ const handleDropdownClick = (event: Event): void => {
  * 处理可编辑字段逻辑
  * @param target - 目标高亮元素
  */
-const handleEditableField = (target: HTMLElement): void => {
+  const handleEditableField = (target: HTMLElement): void => {
   const inputSpan = target.querySelector('.input') as HTMLElement
   const placeholderSpan = target.querySelector('.placeholder') as HTMLElement
 
@@ -364,7 +347,7 @@ const handleEditableField = (target: HTMLElement): void => {
       // 如果元素被意外删除，重新创建（极端情况）
       const newSpan = document.createElement('span')
       newSpan.className = 'input'
-      newSpan.appendChild(document.createTextNode(''))
+      newSpan.appendChild(document.createTextNode('\u200B'))
       target.insertBefore(newSpan, placeholderSpan)
       return newSpan
     }
@@ -378,15 +361,18 @@ const handleEditableField = (target: HTMLElement): void => {
     if (isProgrammaticChange) return
 
     const currentSpan = ensureInputElement()
-    const hasContent = currentSpan.textContent?.trim() !== ''
+    const rawText = currentSpan.textContent ?? ''
+    const normalized = rawText.replace(/[\u200B\uFEFF]/g, '')
+    const hasContent = normalized.trim() !== ''
 
     if (!hasContent) {
+      // 空内容：插入零宽占位字符，保证可编辑和光标可定位
       isProgrammaticChange = true
-      currentSpan.innerHTML = '' // 清空但保留元素
-      const textNode = document.createTextNode('\uFEFF')
+      currentSpan.innerHTML = ''
+      const textNode = document.createTextNode('\u200B')
       currentSpan.appendChild(textNode)
 
-      // 移动光标到零宽空格后
+      // 将光标定位到占位字符后
       const range = document.createRange()
       range.setStart(textNode, 1)
       range.collapse(true)
@@ -417,9 +403,53 @@ const handleEditableField = (target: HTMLElement): void => {
   const events = ['keydown', 'input', 'paste', 'cut', 'blur']
   events.forEach(evt => {
     inputSpan.addEventListener(evt, (e) => {
-      if (e.type === 'keydown' && ((e as KeyboardEvent).key === 'Backspace' || (e as KeyboardEvent).key === 'Delete')) {
-        // 对删除操作做特殊处理
-        setTimeout(handleChange, 0)
+      if (e.type === 'keydown') {
+        const key = (e as KeyboardEvent).key
+        const raw = inputSpan.textContent ?? ''
+        const isEmpty = raw.replace(/[\u200B\uFEFF]/g, '').trim() === ''
+
+        if ((key === 'Backspace' || key === 'Delete') && isEmpty) {
+          // 空内容下允许继续删除该高亮样式：移除整个 editable-field 包裹
+          e.preventDefault()
+
+          const parent = target.parentNode
+          const prev = target.previousSibling
+          const next = target.nextSibling
+          target.remove()
+
+          // 将光标定位到相邻节点（优先前一个，否则后一个），以便用户继续删除
+          const range = document.createRange()
+          const sel = window.getSelection()
+
+          const focusNode = (node: Node | null): Node | null => {
+            if (!node) return null
+            if (node.nodeType === 3) return node
+            // 寻找元素内最后一个文本节点
+            const walker = document.createTreeWalker(node as Node, NodeFilter.SHOW_TEXT)
+            let lastText: Node | null = null
+            while (walker.nextNode()) lastText = walker.currentNode
+            return lastText || node
+          }
+
+          const nodeForCaret = focusNode(prev) || focusNode(next) || parent || inputSpan
+          const length = nodeForCaret.nodeType === 3 ? (nodeForCaret.textContent?.length || 0) : (nodeForCaret.childNodes.length)
+          try {
+            range.setStart(nodeForCaret, Math.max(length, 0))
+            range.collapse(true)
+            sel?.removeAllRanges()
+            sel?.addRange(range)
+          } catch {}
+
+          // 同步占位显示（父节点已移除，不再需要处理）
+          return
+        }
+
+        // 非删除或非空内容，常规变化
+        if (key === 'Backspace' || key === 'Delete') {
+          setTimeout(handleChange, 0)
+        } else {
+          handleChange()
+        }
       } else {
         handleChange()
       }
@@ -445,11 +475,12 @@ const showDropdownMenu = async (target: HTMLElement, type: string): Promise<void
 
   // 使用getBoundingClientRect()获取精确位置
   const targetRect = target.getBoundingClientRect()
-  const containerRect = smartInputRef.value?.getBoundingClientRect()
+  // 使用组件容器的坐标以确保在嵌入其他组件时位置计算正确
+  const containerRect = containerRef.value?.getBoundingClientRect()
 
   if (!containerRect) return
 
-  // 计算相对于容器的位置
+  // 计算相对于容器的位置（容器为定位参考）
   const relativeTop = targetRect.bottom - containerRect.top
   const relativeLeft = targetRect.left - containerRect.left
 
@@ -457,22 +488,28 @@ const showDropdownMenu = async (target: HTMLElement, type: string): Promise<void
   dropdownStyle.value.top = `${relativeTop + 4}px` // 4px垂直间距
   dropdownStyle.value.left = `${relativeLeft}px`
 
-  // 确保下拉框不超出视窗边界
+  // 确保下拉框不超出容器边界（而非视窗），适配嵌入场景
   if (dropdownMenuRef.value) {
     const dropdownRect = dropdownMenuRef.value.getBoundingClientRect()
-    const viewportWidth = window.innerWidth
-    const viewportHeight = window.innerHeight
+    const dropdownWidth = dropdownRect.width
+    const dropdownHeight = dropdownRect.height
 
-    // 水平边界检查
-    if (dropdownRect.right > viewportWidth) {
-      const adjustment = dropdownRect.right - viewportWidth + 10
-      dropdownStyle.value.left = `${relativeLeft - adjustment}px`
+    // 预测位置相对于容器的边界
+    const predictedRight = relativeLeft + dropdownWidth
+    const predictedBottom = (relativeTop + 4) + dropdownHeight
+
+    // 水平边界检查（容器宽度）
+    const containerWidth = containerRect.width
+    if (predictedRight > containerWidth) {
+      const adjustment = predictedRight - containerWidth + 10 // 右侧间距
+      dropdownStyle.value.left = `${Math.max(relativeLeft - adjustment, 0)}px`
     }
 
-    // 垂直边界检查 - 如果下方空间不足，显示在上方
-    if (dropdownRect.bottom > viewportHeight) {
-      const relativeTopAbove = targetRect.top - containerRect.top - dropdownRect.height
-      dropdownStyle.value.top = `${relativeTopAbove - 4}px` // 4px垂直间距
+    // 垂直边界检查（容器高度），如果下方空间不足，显示在上方
+    const containerHeight = containerRect.height
+    if (predictedBottom > containerHeight) {
+      const relativeTopAbove = targetRect.top - containerRect.top - dropdownHeight
+      dropdownStyle.value.top = `${Math.max(relativeTopAbove - 4, 0)}px` // 4px垂直间距
     }
   }
 }
@@ -548,7 +585,7 @@ watch(
 onMounted(() => {
   console.log('组件挂载监听handleClickOutside');
   document.addEventListener('click', handleClickOutside)
-  
+
   // 初始化字段值
   initializeFieldValues()
 })
@@ -582,16 +619,12 @@ onUnmounted(() => {
   overflow: visible;
   /* 移除任何可能的高度限制 */
   max-height: none;
-  /* 确保文本能够在字符级别换行 */
-  word-break: break-word;
+  /* 文本换行策略：
+     - break-all：确保字符级别换行（适合中英文混排、避免长词溢出）
+     - overflow-wrap:anywhere：作为补充，必要时在任意位置断行，防止超长不可断字符串溢出 */
+  word-break: break-all;
   overflow-wrap: anywhere;
   white-space: normal;
-}
-
-/* 标签字段保持inline-block以维持独立性和交互功能 */
-.smart-input .highlight {
-  display: inline-block;
-  vertical-align: baseline;
 }
 
 .highlight {
@@ -601,6 +634,12 @@ onUnmounted(() => {
   cursor: pointer;
   min-width: 20px;
   transition: background-color 0.2s ease;
+}
+
+/* 标签字段保持inline-block以维持独立性和交互功能 */
+.smart-input .highlight {
+  display: inline-block;
+  vertical-align: baseline;
 }
 
 /* 输入类型标签样式 */

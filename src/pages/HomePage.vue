@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import RichInput from '@/components/RichInput.vue'
-import type { RichInputConfig } from '@/components/RichInput.vue'
+import type { RichInputConfig } from '@/types/rich-input'
 
 /**
  * 首页组件
@@ -135,6 +135,16 @@ const switchTemplate = (templateType: string): void => {
           <p class="text-gray-600 mb-6">
             这是一个支持动态模板和智能提示的富文本输入组件，点击高亮区域可以编辑或选择内容。
           </p>
+
+          <!-- 独立入口：点击进入编辑器页面 -->
+          <div class="mb-6">
+            <RouterLink
+              to="/editor"
+              class="inline-block px-4 py-2 rounded-lg bg-blue-500 text-white hover:bg-blue-600 transition-colors"
+            >
+              进入智能编辑器
+            </RouterLink>
+          </div>
           
           <!-- 集成RichInput组件，传入动态配置 -->
           <RichInput :config="currentConfig" />
