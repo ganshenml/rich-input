@@ -438,7 +438,26 @@ const handleDropdownClick = (event: Event): void => {
             range.collapse(true)
             sel?.removeAllRanges()
             sel?.addRange(range)
-          } catch {}
+          } catch (err) {
+            // 光标定位失败时的降级处理：回退到整体输入容器末尾
+            // 说明：在某些边界情况下（例如目标节点文本长度为 0，或不可编辑节点），setStart 可能抛出异常。
+            // 为避免用户输入被中断，这里将光标安全地定位到 smart-input 容器的末尾。
+            try {
+              if (smartInputRef.value) {
+                const endRange = document.createRange()
+                endRange.selectNodeContents(smartInputRef.value)
+                endRange.collapse(false)
+                sel?.removeAllRanges()
+                sel?.addRange(endRange)
+              }
+              // 如项目有封装的日志工具，这里可替换为 logger.warn
+              console.warn('[RichInput] Caret fallback to container end due to setStart error:', err)
+            } catch (fallbackErr) {
+              // 二次降级失败：静默处理，确保不影响后续编辑
+              // 如项目有封装的日志工具，这里可替换为 logger.error
+              console.warn('[RichInput] Caret fallback failed:', fallbackErr)
+            }
+          }
 
           // 同步占位显示（父节点已移除，不再需要处理）
           return
@@ -602,9 +621,21 @@ onUnmounted(() => {
 .rich-input-container {
   position: relative;
   width: 100%;
-  border-radius: 4px;
-  border: 1px solid #ddd;
+  /* 科技感主题（indigo）：统一为 #6366F1 并增强圆角可见性 */
+  border-radius: 12px;
+  /* 默认不显示边框，仅在选中（focus-within）时显示 */
+  border: none;
+  background: #FFFFFF; /* 保证边框与背景对比 */
+  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.14); /* 轻微的 indigo 阴影 */
+  /* 为内部编辑区留出内缩空间，确保外部圆角边框可见 */
+  padding: 6px;
   min-height: 200px;
+}
+
+/* 容器选中态：显示更深的边框颜色 */
+.rich-input-container:focus-within {
+  border: 1.5px solid #4F46E5; /* indigo-600 更深一点 */
+  box-shadow: 0 6px 16px rgba(79, 70, 229, 0.18);
 }
 
 .smart-input {
@@ -614,6 +645,11 @@ onUnmounted(() => {
   display: block;
   background-color: #fff;
   font-size: 14px;
+  /* 内部编辑区圆角，避免覆盖外部圆角边框 */
+  border-radius: 8px;
+  /* 默认不显示边框与阴影，仅在选中时呈现 */
+  border: none;
+  box-shadow: none;
   /* 确保容器能够根据内容自动增高 */
   height: auto;
   overflow: visible;
@@ -627,13 +663,31 @@ onUnmounted(() => {
   white-space: normal;
 }
 
+/* 移除浏览器默认的焦点轮廓，避免蓝色边框 */
+.smart-input:focus,
+.smart-input:focus-visible {
+  outline: none;
+}
+
+/* 移除可编辑字段（contenteditable）的默认焦点轮廓 */
+.editable-field:focus,
+.editable-field:focus-visible {
+  outline: none;
+}
+
+/* 内部编辑区选中态：不显示边框与阴影，统一由外层容器体现选中 */
+/* 保持 .smart-input 无边框与阴影，以避免“内侧边框”视觉干扰 */
+
 .highlight {
-  background-color: #e0f0ff;
-  border-radius: 3px;
+  /* 科技感 indigo：半透明背景与边框统一 #6366F1 */
+  background-color: rgba(99, 102, 241, 0.12);
+  /* 默认无边框，选中态才显示更深边框 */
+  border: none;
+  border-radius: 6px;
   padding: 4px;
   cursor: pointer;
   min-width: 20px;
-  transition: background-color 0.2s ease;
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 /* 标签字段保持inline-block以维持独立性和交互功能 */
@@ -648,33 +702,41 @@ onUnmounted(() => {
 }
 
 .highlight:hover {
-  background-color: #d0e8ff;
+  /* 悬停时加深背景并轻微发光 */
+  background-color: rgba(99, 102, 241, 0.18);
+  /* 不在悬停态展示边框，仅在选中态展示 */
 }
 
-/* 输入文本样式 - 深蓝色显示 */
+/* 聚焦时的可视化强化，增强科技感反馈 */
+/* 高亮块选中态：仅在焦点内显示更深边框 */
+.editable-field:focus-within .highlight {
+  border: 1.5px solid #4F46E5; /* indigo-600 更深一点 */
+}
+
+/* 输入文本样式 - 科技感 indigo */
 .highlight .input {
-  color: #264cad;
-  /* 深蓝色 RGB(0,0,139) */
-  font-weight: 500;
+  color: #6366F1; /* indigo-500 */
+  font-weight: 600;
 }
 
-/* 占位符样式 */
+/* 占位符样式：略浅的 indigo，保持可读性 */
 .highlight .placeholder {
   font-style: normal;
-  color: #6e7ca0;
+  color: #A5B4FC; /* indigo-300 */
   pointer-events: none;
 }
 
-/* 已填写内容样式 */
+/* 已填写内容样式：降低背景透明度，维持科技感 */
 .highlight:not(:has(.placeholder[style*="display: inline"])) {
-  background-color: #e7eff7;
+  background-color: rgba(99, 102, 241, 0.06);
 }
 
 .dropdown-menu {
   position: absolute;
-  border: 1px solid #eee;
+  /* 下拉菜单边框采用 indigo 并增加阴影 */
+  border: 1px solid rgba(99, 102, 241, 0.35);
   background: white;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.16);
   border-radius: 4px;
   z-index: 1000;
   min-width: 120px;
@@ -690,7 +752,8 @@ onUnmounted(() => {
 }
 
 .dropdown-item:hover {
-  background: #f5f5f5;
+  /* 下拉项悬停背景为轻微 indigo 透明 */
+  background: rgba(99, 102, 241, 0.08);
 }
 
 .dropdown-item:first-child {
