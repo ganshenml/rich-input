@@ -10,7 +10,10 @@ import type { RichInputConfig } from '@/types/rich-input'
 
 // 示例配置1：默认配置
 const defaultConfig: RichInputConfig = {
-  template: "我是一名{role}需要写一篇关于{topic}的{format}。面向{audience}宣传产品。",
+  // 多行模板字面量 + pre-wrap，确保默认示例也显示换行
+  template: `我是一名{role}
+需要写一篇关于{topic}的{format}。
+面向{audience}宣传产品。`,
   fields: {
     role: { type: 'input', placeholder: '公众号博主', defaultValue: '公众号博主' },
     topic: { type: 'select', options: ['科技', '教育', '健康'], defaultValue: '[主题]' },

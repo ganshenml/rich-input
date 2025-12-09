@@ -100,7 +100,10 @@ interface Props {
  */
 const props = withDefaults(defineProps<Props>(), {
   config: () => ({
-    template: "我是一名{role}需要写一篇关于{topic}的{format}。面向{audience}宣传产品。",
+    // 模板支持换行显示：使用多行模板字面量，结合 .smart-input 的 white-space: pre-wrap
+    template: `我是一名{role}
+需要写一篇关于{topic}的{format}。
+面向{audience}宣传产品。`,
     fields: {
       role: { type: 'input', placeholder: '公众号博主', defaultValue: '公众号博主' },
       topic: { type: 'select', options: ['科技', '教育', '健康'], defaultValue: '[主题]' },
@@ -724,7 +727,8 @@ onUnmounted(() => {
      - overflow-wrap:anywhere：作为补充，必要时在任意位置断行，防止超长不可断字符串溢出 */
   word-break: break-all;
   overflow-wrap: anywhere;
-  white-space: normal;
+  /* 保留文本中的换行符与空白，用于渲染模板中的 \n 和多行字符串 */
+  white-space: pre-wrap;
 }
 
 /* 移除浏览器默认的焦点轮廓，避免蓝色边框 */
