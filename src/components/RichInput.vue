@@ -1,7 +1,7 @@
 <template>
   <div class="rich-input-container" ref="containerRef">
     <!-- 智能输入框主体 -->
-    <div ref="smartInputRef" class="smart-input" contenteditable="true" :key="renderKey" @click="handleInputClick">
+    <div ref="smartInputRef" class="smart-input" contenteditable="true" :key="renderKey" @click="handleInputClick" @input="handleContainerInput">
       <template v-for="(segment, index) in templateSegments" :key="index">
         <!-- 普通文本片段 -->
         <template v-if="segment.type === 'text'">
@@ -181,6 +181,17 @@ const getCurrentText = (): string => {
 }
 
 /**
+ * 获取可见文本（WYSIWYG）：读取 DOM 的 innerText，排除 display:none 的占位符
+ * 同时移除零宽字符，保持文本干净
+ */
+const getDisplayText = (): string => {
+  const el = smartInputRef.value
+  if (!el) return getCurrentText()
+  const raw = (el as HTMLElement).innerText || ''
+  return raw.replace(/[\u200B\uFEFF]/g, '')
+}
+
+/**
  * 获取当前所有字段值的拷贝
  */
 const getValues = (): Record<string, string> => ({ ...fieldValues.value })
@@ -208,7 +219,8 @@ const getSelections = (): Record<string, string> => {
  */
 const emitChange = (): void => {
   try {
-    emit('change', { text: getCurrentText(), values: { ...fieldValues.value } })
+    // 如有统一日志工具，可替换下行 console 为 logger.info
+    emit('change', { text: getDisplayText(), values: { ...fieldValues.value } })
   } catch (err) {
     // 如项目有封装日志工具，请替换为 logger.warn/err
     // 这里通常不会抛错（无监听者时Vue内部忽略），保留catch以满足严格规则
@@ -220,7 +232,10 @@ const emitChange = (): void => {
  * 将内部API暴露给父组件使用
  */
 defineExpose({
+  // 兼容原 API：保留基于字段值生成的文本
   getText: getCurrentText,
+  // 新增：返回可见文本（包括容器中的自由编辑）
+  getRenderedText: getDisplayText,
   getValues,
   getSelection,
   getSelections,
@@ -345,6 +360,11 @@ const templateSegments = computed(() => {
   return segments
 })
 
+// 容器级输入事件：任意位置变更均上报（不修改 fieldValues，只更新 text）
+const handleContainerInput = (_evt: Event): void => {
+  emitChange()
+}
+
 
 
 /**
@@ -407,6 +427,21 @@ const handleDropdownClick = (event: Event): void => {
   if (!inputSpan.firstChild || inputSpan.firstChild.nodeType !== 3) {
     inputSpan.innerHTML = ''
     inputSpan.appendChild(document.createTextNode(''))
+  }
+
+  // 初始点击后将光标定位到 inputSpan 文本末尾，确保输入发生在字段内
+  try {
+    const textNode = inputSpan.firstChild as Text
+    const range = document.createRange()
+    const len = textNode?.textContent?.length ?? 0
+    range.setStart(textNode, Math.max(len, 0))
+    range.collapse(true)
+    const sel = window.getSelection()
+    sel?.removeAllRanges()
+    sel?.addRange(range)
+  } catch (err) {
+    // 如项目有封装日志工具，这里可替换为 logger.warn
+    console.warn('[RichInput] Failed to set caret to input end:', err)
   }
 
   // 防循环标志
@@ -480,10 +515,10 @@ const handleDropdownClick = (event: Event): void => {
     characterData: true
   })
 
-  // 关键事件监听
+  // 关键事件监听：绑定到高亮块（编辑宿主）
   const events = ['keydown', 'input', 'paste', 'cut', 'blur']
   events.forEach(evt => {
-    inputSpan.addEventListener(evt, (e) => {
+    target.addEventListener(evt, (e) => {
       if (e.type === 'keydown') {
         const key = (e as KeyboardEvent).key
         const raw = inputSpan.textContent ?? ''
