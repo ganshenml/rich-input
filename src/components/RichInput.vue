@@ -772,6 +772,11 @@ onUnmounted(() => {
   outline: none;
 }
 
+/* 输入类型标签样式 */
+.editable-field {
+  padding: 4px;
+}
+
 /* 移除可编辑字段（contenteditable）的默认焦点轮廓 */
 .editable-field:focus,
 .editable-field:focus-visible {
@@ -799,10 +804,6 @@ onUnmounted(() => {
   vertical-align: baseline;
 }
 
-/* 输入类型标签样式 */
-.editable-field {
-  padding: 4px;
-}
 
 /* 下拉槽位：为可下拉的字段添加向下箭头（纯CSS，无SVG） */
 .dropdown-field {
